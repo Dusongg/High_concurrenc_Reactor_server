@@ -287,7 +287,7 @@ class Channel {
         int _fd;
         EventLoop *_loop;
         uint32_t _events;  // 当前需要监控的事件
-        uint32_t _revents; // 当前连接触发的事件
+        uint32_t _revents; // 当前连接触发的事件(next)
         using eventCallback = std::function<void()>;
         eventCallback _read_callback;   
         eventCallback _write_callback;  
@@ -402,10 +402,10 @@ class Poller {
                 abort();
             }
             for (int i = 0; i < nready; i++) {
-                auto it = _channels.find(_events[i].data.fd);
-                assert(it != _channels.end());
-                it->second->setREvents(_events[i].events);//设置实际就绪的事件
-                active->push_back(it->second);
+                assert(_channels.contains(_events[i].data.fd));
+
+                _channels[i]->setREvents(_events[i].events);//设置实际就绪的事件
+                active->push_back(_channels[i]);
             }
             return; 
         }
@@ -417,7 +417,7 @@ class TimerTask{
     private:
         uint64_t _id;       // 定时器任务对象ID
         uint32_t _timeout;  //定时任务的超时时间
-        bool _canceled;     // false-表示没有被取消， true-表示被取消
+        bool _canceled;     // true:定时器表示被取消
         taskFunc _task_cb;  //定时器对象要执行的定时任务
         releaseFunc _release; //用于删除TimerWheel中保存的定时器对象信息
     public:
@@ -490,11 +490,11 @@ class TimerWheel {
             }
         }
         void timerAddInLoop(uint64_t id, uint32_t delay, const taskFunc &cb) {
-            sPtrTask pt(new TimerTask(id, delay, cb));
-            pt->setRelease(std::bind(&TimerWheel::removeTimer, this, id));
+            sPtrTask sptr(new TimerTask(id, delay, cb));
+            sptr->setRelease(std::bind(&TimerWheel::removeTimer, this, id));
             int pos = (_tick + delay) % _capacity;
-            _wheel[pos].push_back(pt);
-            _timers[id] = weakTask(pt);
+            _wheel[pos].push_back(sptr);
+            _timers[id] = weakTask(sptr);
         }
         void timerRefreshInLoop(uint64_t id) {
             //通过保存的定时器对象的weak_ptr构造一个shared_ptr出来，添加到轮子中
@@ -502,38 +502,33 @@ class TimerWheel {
             if (it == _timers.end()) {
                 return;//没找着定时任务，没法刷新，没法延迟
             }
-            sPtrTask pt = it->second.lock();//lock获取weak_ptr管理的对象对应的shared_ptr
-            int delay = pt->delayTime();
+            sPtrTask sptr = it->second.lock();//lock获取weak_ptr管理的对象对应的shared_ptr
+            int delay = sptr->delayTime();
             int pos = (_tick + delay) % _capacity;
-            _wheel[pos].push_back(pt);
+            _wheel[pos].push_back(sptr);
         }
         void timerCancelInLoop(uint64_t id) {
             auto it = _timers.find(id);
             if (it == _timers.end()) {
                 return;//没找着定时任务，没法刷新，没法延迟
             }
-            sPtrTask pt = it->second.lock();
-            if (pt) pt->cancel();
+            sPtrTask sptr = it->second.lock();
+            if (sptr) sptr->cancel();
         }
     public:
         TimerWheel(EventLoop *loop):_capacity(60), _tick(0), _wheel(_capacity), _loop(loop), 
             _timerfd(createTimerfd()), _timer_channel(new Channel(_loop, _timerfd)) {
-            _timer_channel->setReadCallback(std::bind(&TimerWheel::onTime, this));
+            _timer_channel->setReadCallback(std::bind(&TimerWheel::onTime, this));      //每秒钟触发
             _timer_channel->enableRead();//启动读事件监控
         }
-        /*定时器中有个_timers成员，定时器信息的操作有可能在多线程中进行，因此需要考虑线程安全问题*/
-        /*如果不想加锁，那就把对定期的所有操作，都放到一个线程中进行*/
+        
+        //在任务队列中执行添加、刷新、删除
         void timerAdd(uint64_t id, uint32_t delay, const taskFunc &cb);
-        //刷新/延迟定时任务
         void timerRefresh(uint64_t id);
         void timerCancel(uint64_t id);
         /*这个接口存在线程安全问题--这个接口实际上不能被外界使用者调用，只能在模块内，在对应的EventLoop线程内执行*/
         bool hasTimer(uint64_t id) {
-            auto it = _timers.find(id);
-            if (it == _timers.end()) {
-                return false;
-            }
-            return true;
+            return _timers.contains(id);
         }
 };
 
