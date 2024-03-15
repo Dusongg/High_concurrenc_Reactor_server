@@ -2,7 +2,7 @@
 #include <iostream>
 int main() {
     Socket server;
-    server._createServer(8888);
+    server.createServer(8888);
     char buffer[1024]{0};
     Socket conn(server._accept());
     std::cout << "action" << std::endl;
