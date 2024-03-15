@@ -1,4 +1,5 @@
 #include <vector>
+#include <functional>
 #include <cstdint>
 #include <cassert>
 #include <string>
@@ -6,12 +7,15 @@
 #include <iostream>
 #include <ctime>
 #include <pthread.h>
+
 #include <sys/types.h>        
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
+
+ #include <sys/epoll.h>
 
 #define INF 0
 #define DBG 1
@@ -143,7 +147,7 @@ class Socket {
         Socket():_sockfd(-1) {}
         Socket(int fd): _sockfd(fd) {}
         ~Socket() { _close(); }
-        int _fd() { return _sockfd; }
+        int fd() { return _sockfd; }
         bool _create() {
             _sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
             if (_sockfd < 0) {
@@ -207,7 +211,7 @@ class Socket {
             }
             return ret; 
         }
-        ssize_t _nonBlockRecv(void *buf, size_t len) {
+        ssize_t nonBlockRecv(void *buf, size_t len) {
             return _recv(buf, len, MSG_DONTWAIT); // MSG_DONTWAIT 表示当前接收为非阻塞。
         }
         ssize_t _send(const void *buf, size_t len, int flag = 0) {
@@ -221,7 +225,7 @@ class Socket {
             }
             return ret;
         }
-        ssize_t _nonBlockSend(void *buf, size_t len) {
+        ssize_t nonBlockSend(void *buf, size_t len) {
             if (len == 0) return 0;
             
             return _send(buf, len, MSG_DONTWAIT); // MSG_DONTWAIT 表示当前发送为非阻塞。
@@ -233,7 +237,7 @@ class Socket {
             }
         }
         // server
-        bool _createServer(uint16_t port, const std::string &ip = "0.0.0.0", bool is_block = false) {
+        bool createServer(uint16_t port, const std::string &ip = "0.0.0.0", bool is_block = false) {
             //1. 创建套接字，2. 绑定地址，3. 开始监听，4. 设置非阻塞， 5. 启动地址重用
             if (_create() == false) return false;
             if (is_block) NonBlock();
@@ -243,7 +247,7 @@ class Socket {
             return true;
         }
         // client
-        bool _createClient(uint16_t port, const std::string &ip) {
+        bool createClient(uint16_t port, const std::string &ip) {
             if (_create() == false) return false;
             if (_connect(ip, port) == false) return false;
             return true;
@@ -264,3 +268,64 @@ class Socket {
 };
 
 
+class Poller;
+class EventLoop;
+class Channel {
+    private:
+        int _fd;
+        EventLoop *_loop;
+        uint32_t _events;  // 当前需要监控的事件
+        uint32_t _revents; // 当前连接触发的事件
+        using eventCallback = std::function<void()>;
+        eventCallback _read_callback;   
+        eventCallback _write_callback;  
+        eventCallback _error_callback; 
+        eventCallback _close_callback;  
+        eventCallback _event_callback; 
+    public:
+        Channel(EventLoop *loop, int fd):_fd(fd), _events(0), _revents(0), _loop(loop) {}
+        int fd() { return _fd; }
+        uint32_t events() { return _events; }//获取想要监控的事件
+        void setREvents(uint32_t e) { _revents = e; }//设置实际就绪的事件
+        void setReadCallback(const eventCallback &cb) { _read_callback = cb; }
+        void setWriteCallback(const eventCallback &cb) { _write_callback = cb; }
+        void setErrorCallback(const eventCallback &cb) { _error_callback = cb; }
+        void setCloseCallback(const eventCallback &cb) { _close_callback = cb; }
+        void seteventCallback(const eventCallback &cb) { _event_callback = cb; }
+        //当前是否监控了可读
+        bool readAble() { return (_events & EPOLLIN); } 
+        //当前是否监控了可写
+        bool writeAble() { return (_events & EPOLLOUT); }
+        //启动读事件监控
+        void enableRead() { 
+            _events |= EPOLLIN;
+            update(); 
+        }
+        //启动写事件监控
+        void enableWrite() { _events |= EPOLLOUT; update(); }
+        //关闭读事件监控
+        void disableRead() { _events &= ~EPOLLIN; update(); }
+        //关闭写事件监控
+        void disableWrite() { _events &= ~EPOLLOUT; update(); }
+        //关闭所有事件监控
+        void disableAll() { _events = 0; update(); }
+        //移除监控
+        void remove();
+        void update();
+        //事件处理，一旦连接触发了事件，就调用这个函数，自己触发了什么事件如何处理自己决定
+        void handleEvent() {
+            if ((_revents & EPOLLIN) || (_revents & EPOLLRDHUP) || (_revents & EPOLLPRI)) {
+                /*不管任何事件，都调用的回调函数*/
+                if (_read_callback) _read_callback();
+            }
+            /*有可能会释放连接的操作事件，一次只处理一个*/
+            if (_revents & EPOLLOUT) {
+                if (_write_callback) _write_callback();
+            }else if (_revents & EPOLLERR) {
+                if (_error_callback) _error_callback();//一旦出错，就会释放连接，因此要放到前边调用任意回调
+            }else if (_revents & EPOLLHUP) {
+                if (_close_callback) _close_callback();
+            }
+            if (_event_callback) _event_callback();
+        }
+};
