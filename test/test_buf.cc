@@ -1,4 +1,4 @@
-#include "server.hpp"
+#include "../src/server.hpp"
 int main() {
 
     /*基本测试
@@ -22,6 +22,7 @@ int main() {
         std::string line = buf.getLineAndMove();
         DBG_LOG("xxx");
     } 
+
 
     return 0;
 }
