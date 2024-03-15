@@ -3,6 +3,34 @@
 #include <cassert>
 #include <string>
 #include <cstring>
+#include <iostream>
+#include <ctime>
+#include <pthread.h>
+#include <sys/types.h>          /* See NOTES */
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#define INF 0
+#define DBG 1
+#define ERR 2
+#define LOG_LEVEL DBG
+
+#define LOG(level, format, ...) do{\
+        if (level < LOG_LEVEL) break;\
+        time_t t = time(NULL);\
+        struct tm *ltm = localtime(&t);\
+        char tmp[32] = {0};\
+        strftime(tmp, 31, "%H:%M:%S", ltm);\
+        fprintf(stdout, "[%p %s %s:%d] " format "\n", (void*)pthread_self(), tmp, __FILE__, __LINE__, ##__VA_ARGS__);\
+    }while(0)
+
+#define INF_LOG(format, ...) LOG(INF, format, ##__VA_ARGS__)
+#define DBG_LOG(format, ...) LOG(DBG, format, ##__VA_ARGS__)
+#define ERR_LOG(format, ...) LOG(ERR, format, ##__VA_ARGS__)
+
+
 #define BUFFER_DEFAULT_SIZE 1024
 
 class Buffer {
@@ -16,9 +44,9 @@ public:
     inline char* writePosion() {return begin() + _w_idx; }
     inline char* readPosition() { return begin() + _r_idx; }
     //缓冲区末尾空间大小
-    inline uint64_t headIdleSize() { return _buffer.size() - _w_idx; }
+    inline uint64_t tailIdleSize() { return _buffer.size() - _w_idx; }
     //缓冲区起始空间大小
-    inline uint64_t tailIdleSize() { return _r_idx; }
+    inline uint64_t headIdleSize() { return _r_idx; }
     inline uint64_t readAbleSize() { return _w_idx - _r_idx; }
     //将读向后便宜
     inline void moveReadOffset(uint64_t len) {
@@ -93,7 +121,7 @@ public:
         }
         return readAsString(pos - readPosition() + 1);   //+1取出换行字符
     }
-    std::string getLineAndPop() {
+    std::string getLineAndMove() {
         std::string str = getLine();
         moveReadOffset(str.size());
         return str;
