@@ -11,6 +11,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+//regex
+#include <regex>
+
 
 std::unordered_map<int, std::string> _statu_msg{
     {100,  "Continue"},
@@ -242,7 +245,7 @@ class Util {
             return res;
         }
         //状态码
-        static std::string statuDesc(int statu) { return _statu_msg.find(statu) != _statu_msg.end() ? _statu_msg[statu] : "Unkonw"; }
+        static std::string statuDesc(int statu) { return (_statu_msg.find(statu) != _statu_msg.end()) ? _statu_msg[statu] : "Unkonw"; }
         //Context-type
         static std::string extMime(const std::string &filename) {
             //E.G.  xxxx.txt 
@@ -252,7 +255,7 @@ class Util {
             }
             std::string ext = filename.substr(pos);
 
-            return _mime_msg.find(ext) != _mime_msg.end() ? _mime_msg[ext] : "application/octet-stream";
+            return (_mime_msg.find(ext) != _mime_msg.end()) ? _mime_msg[ext] : "application/octet-stream";
         }
 
         static bool isDirectory(const std::string &filename) {
@@ -271,7 +274,7 @@ class Util {
             }
             return S_ISREG(st.st_mode);  //是否为常规文件
         }
-        
+
         //http请求的资源路径有效性判断
         static bool ValidPath(const std::string &path) {
             //思想：按照/进行路径分割，根据有多少子目录，计算目录深度，有多少层，深度不能小于0
@@ -285,6 +288,58 @@ class Util {
                     continue;
                 }
                 level++;
+            }
+            return true;
+        }
+};
+
+class HttpRequest {
+    public:
+        std::string _method;      //请求方法
+        std::string _path;        //资源路径
+        std::string _version;     //协议版本
+        std::string _body;        //请求正文
+        std::smatch _matches;     //资源路径的正则提取数据
+        std::unordered_map<std::string, std::string> _fields;  //头部字段
+        std::unordered_map<std::string, std::string> _params;   //查询字符串
+    public:
+        HttpRequest():_version("HTTP/1.1") {}
+        void ReSet() {
+            _method.clear();
+            _path.clear();
+            _version = "HTTP/1.1";
+            _body.clear();
+            std::smatch match;
+            _matches.swap(match);
+            _fields.clear();
+            _params.clear();
+        }
+        //插入头部字段  --->  key : 字段   val : 字段值
+        inline void setField(const std::string &key, const std::string &val) { _fields.emplace(key, val); }
+        //判断是否存在指定头部字段
+        inline bool hasField(const std::string &key) const { return _fields.find(key) != _fields.end(); }
+        //获取指定头部字段的值
+        std::string getField(const std::string &key) const {
+            return (_fields.find(key) != _fields.end()) ? _fields.at(key) : "";
+        }
+        inline void setParam(const std::string &key, const std::string &val) { _params.emplace(key, val); }
+        inline bool hasParam(const std::string &key) const { return _params.find(key) != _params.end(); }
+        inline std::string getParam(const std::string &key) const { (_params.find(key) != _params.end()) ? _params.at(key) : ""; }
+        //获取正文长度
+        size_t contentLength() const {
+            // Content-Length: 1234\r\n
+            bool ret = hasField("Content-Length");
+            if (ret == false) {
+                return 0;
+            }
+            std::string clen = getField("Content-Length");
+            return std::stol(clen);
+        }
+        //判断是否是短链接  : ture -> 短链接
+        bool isclose() const {
+            // 没有Connection字段，或者有Connection但是值是close，则都是短链接，否则就是长连接
+            if (hasField("Connection") == true && getField("Connection") == "keep-alive") {
+                return false;
             }
             return true;
         }
