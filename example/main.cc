@@ -21,24 +21,14 @@ void onMessage(const sPtrConnection& conn, Buffer* buf) {
     // conn->shutdown();
 }
 
-void newConnection(int fd) {
-    conn_id++; 
-    sPtrConnection conn(new Connection(loop_pool->nextLoop(), conn_id, fd));
-    //
-    conn->setMessageCallback(std::bind(onMessage, std::placeholders::_1, std::placeholders::_2));
-    conn->setSrvClosedCallback(std::bind(connectionDestroy, std::placeholders::_1));
-    conn->setConnectedCallback(std::bind(onConnected, std::placeholders::_1));
-    conn->enableInactiveRelease(10);
-    conn->Established();
-    _conns.emplace(conn_id, conn);
-}
 
 int main() {
-    loop_pool = new LoopThreadPool(&base_loop, 2);
-    loop_pool->create();
-    Acceptor acceptor(&base_loop, 8888);
-    acceptor.setAcceptCallback(std::bind(newConnection, std::placeholders::_1));
-    acceptor.listen();
-    base_loop.run();
+    TcpServer server(8888);
+    server.setThreadCount(2);
+    server.enableInactiveRelease(5);
+    server.setClosedCallback(connectionDestroy);
+    server.setConnectedCallback(onConnected);
+    server.setMessageCallback(onMessage);
+    server.run();
     return 0;
 }
