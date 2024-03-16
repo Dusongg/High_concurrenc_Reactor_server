@@ -29,6 +29,10 @@
 #include <sys/timerfd.h>
 
 #include <../example/any.hpp>
+
+// LoopThread
+#include <condition_variable>
+
 //LOG
 #define INF 0
 #define DBG 1
@@ -605,7 +609,7 @@ public:
         //启动eventfd的读事件监控
         _event_channel->enableRead();
     }
-    //三步走--事件监控-》就绪事件处理-》执行任务
+    //事件监控->就绪事件处理->执行任务
     void run() {
         while(1) {
             //1. 事件监控
@@ -651,6 +655,34 @@ public:
     void timerRefresh(uint64_t id) { return _timer_wheel.timerRefresh(id); }
     void timerCancel(uint64_t id) { return _timer_wheel.timerCancel(id); }
     bool hasTimer(uint64_t id) { return _timer_wheel.hasTimer(id); }
+};
+
+class LoopThread {
+    private:
+        std::mutex _mutex;          
+        std::condition_variable _cond;  
+        EventLoop *_loop;       // 线程内实例化
+        std::thread _thread;    // EventLoop对应的线程
+    public:
+        /*创建线程，设定线程入口函数*/
+        LoopThread():_loop(nullptr), _thread([&]() {
+            EventLoop loop;
+            {
+                std::unique_lock<std::mutex> lock(_mutex);
+                _loop = &loop;
+                _cond.notify_all();
+            }
+            loop.run();
+        }) {}
+        EventLoop *getLoop() {
+            EventLoop *loop = nullptr;
+            {
+                std::unique_lock<std::mutex> lock(_mutex);
+                _cond.wait(lock, [&](){ return _loop != nullptr; });
+                loop = _loop;
+            }
+            return loop;
+        }
 };
 
 
@@ -883,9 +915,9 @@ private:
 
 class Acceptor {
 private:
-    Socket _socket;//用于创建监听套接字
-    EventLoop *_loop; //用于对监听套接字进行事件监控
-    Channel _channel; //用于对监听套接字进行事件管理
+    Socket _socket;  //启动server，获取listenfd, 
+    EventLoop *_loop; //事件监控
+    Channel _channel; //事件管理
 
     using AcceptCallback = std::function<void(int)>;
     AcceptCallback _accept_callback;
@@ -903,6 +935,7 @@ private:
         return _socket.fd();
     }
 public:
+    //这里不能将启动读事件设置到构造函数中，因为可能事件触发会在设置回调函数之前进行
     Acceptor(EventLoop *loop, int port): _socket(CreateServer(port)), _loop(loop), 
         _channel(loop, _socket.fd()) {
         _channel.setReadCallback(std::bind(&Acceptor::handleRead, this));
