@@ -980,7 +980,7 @@ private:
     bool _enable_inactive_release;//是否启动了非活跃连接超时销毁的判断标志
     EventLoop _baseloop;    //这是主线程的EventLoop对象，负责监听事件的处理
     Acceptor _acceptor;    //这是监听套接字的管理对象
-    LoopThreadPool _pool;   //这是从属EventLoop线程池
+    LoopThreadPool _pool;   //这是从属EventLoop线程池nextLoop
     std::unordered_map<uint64_t, sPtrConnection> _conns;//保存管理所有连接对应的shared_ptr对象
 
     using ConnectedCallback = std::function<void(const sPtrConnection&)>;
@@ -1001,11 +1001,13 @@ private:
     void newConnection(int fd) {
         _next_id++;
         sPtrConnection conn(new Connection(_pool.nextLoop(), _next_id, fd));
+        //设置回调
         conn->setMessageCallback(_message_callback);
         conn->setClosedCallback(_closed_callback);
         conn->setConnectedCallback(_connected_callback);
         conn->setAnyEventCallback(_event_callback);
         conn->setSrvClosedCallback(std::bind(&TcpServer::removeConnection, this, std::placeholders::_1));
+
         if (_enable_inactive_release) conn->enableInactiveRelease(_timeout);//启动非活跃超时销毁
         conn->established();//就绪初始化
         _conns.emplace(_next_id, conn);
