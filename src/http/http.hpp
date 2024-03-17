@@ -66,7 +66,7 @@ std::unordered_map<int, std::string> _statu_msg{
     {426,  "Upgrade Required"},
     {428,  "Precondition Required"},
     {429,  "Too Many Requests"},
-    {431,  "Request Header Fields Too Large"},
+    {431,  "Request Header Headers Too Large"},
     {451,  "Unavailable For Legal Reasons"},
     {501,  "Not Implemented"},
     {502,  "Bad Gateway"},
@@ -300,7 +300,7 @@ class HttpRequest {
         std::string _version;     //协议版本
         std::string _body;        //请求正文
         std::smatch _matches;     //资源路径的正则提取数据
-        std::unordered_map<std::string, std::string> _fields;  //头部字段
+        std::unordered_map<std::string, std::string> _headers;  //头部字段
         std::unordered_map<std::string, std::string> _params;   //查询字符串
     public:
         HttpRequest():_version("HTTP/1.1") {}
@@ -311,34 +311,67 @@ class HttpRequest {
             _body.clear();
             std::smatch match;
             _matches.swap(match);
-            _fields.clear();
+            _headers.clear();
             _params.clear();
         }
         //插入头部字段  --->  key : 字段   val : 字段值
-        inline void setField(const std::string &key, const std::string &val) { _fields.emplace(key, val); }
-        //判断是否存在指定头部字段
-        inline bool hasField(const std::string &key) const { return _fields.find(key) != _fields.end(); }
-        //获取指定头部字段的值
-        std::string getField(const std::string &key) const {
-            return (_fields.find(key) != _fields.end()) ? _fields.at(key) : "";
-        }
+        inline void setHeader(const std::string &key, const std::string &val) { _headers.emplace(key, val); }
+        inline bool hasHeader(const std::string &key) const { return _headers.find(key) != _headers.end(); }
+        std::string getHeader(const std::string &key) const { return (_headers.find(key) != _headers.end()) ? _headers.at(key) : ""; }
         inline void setParam(const std::string &key, const std::string &val) { _params.emplace(key, val); }
         inline bool hasParam(const std::string &key) const { return _params.find(key) != _params.end(); }
         inline std::string getParam(const std::string &key) const { (_params.find(key) != _params.end()) ? _params.at(key) : ""; }
         //获取正文长度
         size_t contentLength() const {
             // Content-Length: 1234\r\n
-            bool ret = hasField("Content-Length");
+            bool ret = hasHeader("Content-Length");
             if (ret == false) {
                 return 0;
             }
-            std::string clen = getField("Content-Length");
+            std::string clen = getHeader("Content-Length");
             return std::stol(clen);
         }
         //判断是否是短链接  : ture -> 短链接
         bool isclose() const {
             // 没有Connection字段，或者有Connection但是值是close，则都是短链接，否则就是长连接
-            if (hasField("Connection") == true && getField("Connection") == "keep-alive") {
+            if (hasHeader("Connection") == true && getHeader("Connection") == "keep-alive") {
+                return false;
+            }
+            return true;
+        }
+};
+
+class HttpResponse {
+    public:
+        int _statu;
+        bool _redirect_flag;
+        std::string _body;
+        std::string _redirect_url;
+        std::unordered_map<std::string, std::string> _headers;
+    public:
+        HttpResponse():_redirect_flag(false), _statu(200) {}
+        HttpResponse(int statu):_redirect_flag(false), _statu(statu) {} 
+        void reSet() {
+            _statu = 200;
+            _redirect_flag = false;
+            _body.clear();
+            _redirect_url.clear();
+            _headers.clear();
+        }
+        inline void setHeader(const std::string &key, const std::string &val) { _headers.emplace(key, val); }
+        inline bool hasHeader(const std::string &key) { return _headers.find(key) != _headers.end(); }
+        inline std::string getHeader(const std::string &key) { (_headers.find(key) != _headers.end()) ? _headers.at(key) : ""; }
+        void SetContent(const std::string &body,  const std::string &type = "text/html") {
+            _body = body;
+            setHeader("Content-Type", type);
+        }
+        void setRedirect(const std::string &url, int statu = 302) {
+            _statu = statu;
+            _redirect_flag = true;
+            _redirect_url = url;
+        }
+        bool isClose() {
+            if (hasHeader("Connection") == true && getHeader("Connection") == "keep-alive") {
                 return false;
             }
             return true;
