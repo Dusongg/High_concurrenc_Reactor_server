@@ -321,7 +321,7 @@ class HttpRequest {
         std::string getHeader(const std::string &key) const { return (_headers.find(key) != _headers.end()) ? _headers.at(key) : ""; }
         inline void setParam(const std::string &key, const std::string &val) { _params.emplace(key, val); }
         inline bool hasParam(const std::string &key) const { return _params.find(key) != _params.end(); }
-        inline std::string getParam(const std::string &key) const { (_params.find(key) != _params.end()) ? _params.at(key) : ""; }
+        inline std::string getParam(const std::string &key) const { return(_params.find(key) != _params.end()) ? _params.at(key) : ""; }
         //获取正文长度
         size_t contentLength() const {
             // Content-Length: 1234\r\n
@@ -361,8 +361,8 @@ class HttpResponse {
         }
         inline void setHeader(const std::string &key, const std::string &val) { _headers.emplace(key, val); }
         inline bool hasHeader(const std::string &key) { return _headers.find(key) != _headers.end(); }
-        inline std::string getHeader(const std::string &key) { (_headers.find(key) != _headers.end()) ? _headers.at(key) : ""; }
-        void SetContent(const std::string &body,  const std::string &type = "text/html") {
+        inline std::string getHeader(const std::string &key) { return (_headers.find(key) != _headers.end()) ? _headers.at(key) : ""; }
+        void setContent(const std::string &body,  const std::string &type = "text/html") {
             _body = body;
             setHeader("Content-Type", type);
         }
@@ -576,7 +576,7 @@ private:
         body += "</h1>";
         body += "</body>";
         body += "</html>";
-        rsp->SetContent(body, "text/html");     //设置正文，并设置Content-Type值
+        rsp->setContent(body, "text/html");     //设置正文，并设置Content-Type值
     }
 
     //组织响应报文和发送
@@ -692,7 +692,7 @@ private:
             //1. 获取上下文
             HttpContext* context = conn->getContext()->get<HttpContext>();
             
-            context->recvHttpRequest(buffer);   //解析
+            context->recvHttpRequest(buffer);   //解析请求报文
             HttpRequest& req = context->request();
             HttpResponse rsp(context->respStatu());
             if (context->respStatu() >= 400) {
@@ -726,22 +726,22 @@ public:
         _basedir = path;
     }
     /*设置/添加，请求（请求的正则表达）与处理函数的映射关系*/
-    void Get(const std::string& pattern, const Handler& handler) {
+    void GET(const std::string& pattern, const Handler& handler) {
         _get_route.emplace_back(std::regex(pattern), handler);
     }
-    void Post(const std::string& pattern, const Handler& handler) {
+    void POST(const std::string& pattern, const Handler& handler) {
         _post_route.emplace_back(std::regex(pattern), handler);
     }
-    void Put(const std::string& pattern, const Handler& handler) {
+    void PUT(const std::string& pattern, const Handler& handler) {
         _put_route.emplace_back(std::regex(pattern), handler);
     }
-    void Delete(const std::string& pattern, const Handler& handler) {
+    void DELETE(const std::string& pattern, const Handler& handler) {
         _delete_route.emplace_back(std::regex(pattern), handler);
     }
-    void SetThreadCount(int count) {
+    void setThreadCount(int count) {
         _server.setThreadCount(count);
     }
-    void Listen() {
+    void listen() {
         _server.run();
     }
 };
