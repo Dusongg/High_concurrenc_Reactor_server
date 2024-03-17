@@ -14,6 +14,7 @@
 //regex
 #include <regex>
 
+#define DEFALT_TIMEOUT 30
 
 std::unordered_map<int, std::string> _statu_msg{
     {100,  "Continue"},
@@ -304,7 +305,7 @@ class HttpRequest {
         std::unordered_map<std::string, std::string> _params;   //查询字符串
     public:
         HttpRequest():_version("HTTP/1.1") {}
-        void ReSet() {
+        void reSet() {
             _method.clear();
             _path.clear();
             _version = "HTTP/1.1";
@@ -332,7 +333,7 @@ class HttpRequest {
             return std::stol(clen);
         }
         //判断是否是短链接  : ture -> 短链接
-        bool isclose() const {
+        bool isClose() const {
             // 没有Connection字段，或者有Connection但是值是close，则都是短链接，否则就是长连接
             if (hasHeader("Connection") == true && getHeader("Connection") == "keep-alive") {
                 return false;
@@ -428,9 +429,9 @@ private:
                 _resp_statu = 400;//BAD REQUEST
                 return false;
             }
-            std::string key = Util::UrlDecode(str.substr(0, pos), true);
-            std::string val = Util::UrlDecode(str.substr(pos + 1), true);
-            _request.SetParam(key, val);
+            std::string key = Util::urlDecode(str.substr(0, pos), true);
+            std::string val = Util::urlDecode(str.substr(pos + 1), true);
+            _request.setParam(key, val);
         }
         return true;
     }
@@ -579,9 +580,9 @@ private:
     }
 
     //组织响应报文和发送
-    void writeReponse(const PtrConnection& conn, const HttpRequest& req, HttpResponse& rsp) {
+    void writeReponse(const sPtrConnection& conn, const HttpRequest& req, HttpResponse& rsp) {
         //填写头部字段
-        if (req.close() == true) {
+        if (req.isClose() == true) {
             rsp.setHeader("Connection", "close");
         } else {
             rsp.setHeader("Connection", "keep-alive");
@@ -680,7 +681,7 @@ private:
     }
 
     //建立链接调用设置上下文的回调
-    void OnConnected(const PtrConnection& conn) {
+    void OnConnected(const sPtrConnection& conn) {
         conn->setContext(HttpContext());
         DBG_LOG("NEW CONNECTION %p", conn.get());
     }
@@ -710,17 +711,17 @@ private:
             route(req, &rsp);
             writeReponse(conn, req, rsp);
             context->reSet();
-            if (rsp.close() == true) conn->shutdown();      //短链接通信后直接关闭
+            if (rsp.isClose() == true) conn->shutdown();      //短链接通信后直接关闭
         }
         return;
     }
 public:
     HttpServer(int port, int timeout = DEFALT_TIMEOUT) :_server(port) {
-        _server.EnableInactiveRelease(timeout);
-        _server.SetConnectedCallback(std::bind(&HttpServer::OnConnected, this, std::placeholders::_1));
-        _server.SetMessageCallback(std::bind(&HttpServer::OnMessage, this, std::placeholders::_1, std::placeholders::_2));
-g&     }
-    void setBaseDir(const std::strinpath) {
+        _server.enableInactiveRelease(timeout);
+        _server.setConnectedCallback(std::bind(&HttpServer::OnConnected, this, std::placeholders::_1));
+        _server.setMessageCallback(std::bind(&HttpServer::OnMessage, this, std::placeholders::_1, std::placeholders::_2));
+     }
+    void setBaseDir(const std::string path) {
         assert(Util::isDirectory(path));
         _basedir = path;
     }
