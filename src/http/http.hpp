@@ -157,7 +157,23 @@ std::unordered_map<std::string, std::string> _mime_msg{
 class Util {
     public:
         static size_t split(const std::string &src, std::vector<std::string> *output, const std::string &sep) {
-            boost::split(*output, src, boost::is_any_of(sep), boost::token_compress_on);
+            // boost::split(*output, src, boost::is_any_of(sep), boost::token_compress_on);
+            // return output->size();
+             size_t offset = 0;
+            while(offset < src.size()) {
+                size_t pos = src.find(sep, offset);
+                if (pos == std::string::npos) {
+                    if(pos == src.size()) break;
+                    output->push_back(src.substr(offset));
+                    return output->size();
+                }
+                if (pos == offset) {
+                    offset = pos + sep.size();
+                    continue;
+                }
+                output->push_back(src.substr(offset, pos - offset));
+                offset = pos + sep.size();
+            }
             return output->size();
         }
 
@@ -404,16 +420,18 @@ private:
             _resp_statu = 400;//BAD REQUEST
             return false;
         }
-        //0 : GET /bitejiuyeke/login?user=Dusong&pass=123123 HTTP/1.1
+        //0 : GET /hello/login?user=Dusong&pass=123123 HTTP/1.1
         //1 : GET
-        //2 : /bitejiuyeke/login
-        //3 : user=xiaoming&pass=123123
+        //2 : /hello/login
+        //3 : user=dusong&pass=123123
         //4 : HTTP/1.1
         //请求方法的获取
         _request._method = matches[1];
+        std::cout << matches[1] << std::endl;
         std::transform(_request._method.begin(), _request._method.end(), _request._method.begin(), ::toupper);
         //资源路径的获取，需要进行URL解码操作，但是不需要+转空格
         _request._path = Util::urlDecode(matches[2], false);
+        std::cout << _request._path << std::endl;
         //协议版本的获取
         _request._version = matches[4];
         //查询字符串的获取与处理
