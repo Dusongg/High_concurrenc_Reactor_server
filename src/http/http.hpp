@@ -427,11 +427,9 @@ private:
         //4 : HTTP/1.1
         //请求方法的获取
         _request._method = matches[1];
-        std::cout << matches[1] << std::endl;
         std::transform(_request._method.begin(), _request._method.end(), _request._method.begin(), ::toupper);
         //资源路径的获取，需要进行URL解码操作，但是不需要+转空格
         _request._path = Util::urlDecode(matches[2], false);
-        std::cout << _request._path << std::endl;
         //协议版本的获取
         _request._version = matches[4];
         //查询字符串的获取与处理

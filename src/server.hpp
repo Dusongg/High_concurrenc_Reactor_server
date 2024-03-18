@@ -40,10 +40,10 @@
 #include <signal.h>
 
 //LOG
-#define INF 0
+#define INF 2
 #define DBG 1
-#define ERR 2
-#define LOG_LEVEL DBG
+#define ERR 0
+#define LOG_LEVEL INF
 
 #define LOG(level, format, ...) do{\
         if (level < LOG_LEVEL) break;\
