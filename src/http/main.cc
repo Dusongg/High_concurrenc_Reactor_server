@@ -49,7 +49,7 @@ void DelFile(const HttpRequest &req, HttpResponse *rsp)
 int main()
 {
     HttpServer server(8888);
-    server.setThreadCount(3);
+    server.setThreadCount(10);
     server.setBaseDir(WWWROOT);//设置静态资源根目录，告诉服务器有静态资源请求到来，需要到哪里去找资源文件
     server.GET("/hello", Hello);
     server.POST("/login", Login);

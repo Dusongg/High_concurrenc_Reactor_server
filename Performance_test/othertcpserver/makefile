@@ -1,8 +1,9 @@
 all:io_uring reactor
-io_uring:io_uring.cc
+
+io_uring:io_uring.c
 	gcc -o $@ $^ -luring -static
 
-reactor:reactor.cc
+reactor:reactor.c
 	gcc -o $@ $^ 
 
 .PHONY:clean

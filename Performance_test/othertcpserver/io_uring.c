@@ -157,9 +157,8 @@ int main(int argc, char *argv[]) {
 					ret = sprintf(buffer, 
 							"HTTP/1.1 200 OK\r\n"
 							"Accept-Ranges: bytes\r\n"
-							"Content-Length: 82\r\n"
-							"Content-Type: text/html\r\n"
-							"Date: Sat, 06 Aug 2023 13:16:46 GMT\r\n\r\n"
+							"Content-Length: 77\r\n"
+							"Content-Type: text/html\r\n\r\n"
 							"<html><head><title>TEST</title></head><body><h1>Dusong</h1></body></html>\r\n\r\n");
 					set_event_send(&ring, result.fd, buffer, ret, 0);
 				}

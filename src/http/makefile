@@ -1,5 +1,5 @@
 test:main.cc
-	g++ -o $@ $^ -std=c++20 -lpthread
+	g++ -o $@ $^ -std=c++14 -lpthread
 
 .PHONY:clean
 clean:

@@ -11,7 +11,15 @@ class EchoServer {
             DBG_LOG("CLOSE CONNECTION:%p", conn.get());
         }
         void OnMessage(const sPtrConnection &conn, Buffer *buf) {
-            conn->send(buf->readPosition(), buf->readAbleSize());
+
+            // conn->send(buf->readPosition(), buf->readAbleSize());
+            std::string rep = "HTTP/1.1 200 OK\r\n"
+							"Accept-Ranges: bytes\r\n" 
+							"Content-Length: 77\r\n"
+							"Content-Type: text/html\r\n\r\n"
+							"<html><head><title>TEST</title></head><body><h1>Dusong</h1></body></html>\r\n\r\n";
+            conn->send(rep.c_str(), rep.size());
+            
             buf->moveReadOffset(buf->readAbleSize());
             conn->shutdown();
         }
